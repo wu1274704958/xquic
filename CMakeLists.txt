@@ -1,12 +1,15 @@
 # Copyright (c) 2022, Alibaba Group Holding Limited
 
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 3.10)
 project (xquic)
 
 set (xquic_VERSION_MAJOR 0)
 set (xquic_VERSION_MINOR 1)
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+if(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
+  set(OTH_LIBRARY ws2_32.lib)
+endif()
 # build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -31,26 +34,36 @@ if(${SSL_TYPE} MATCHES "babassl")
         )
     endif()
 elseif(${SSL_TYPE} MATCHES "boringssl")
-    # PATH of ssl
-    if(NOT SSL_PATH)
-        set(SSL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/boringssl)
-    endif()
-
-    # ssl lib denpendency
-    if(NOT SSL_LIB_PATH)
+    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+        find_package(boringssl)
         if(CMAKE_SYSTEM_NAME MATCHES "Windows")
             add_definitions(-DNOCRYPT=1)
-            set(SSL_LIB_PATH
-                ${SSL_PATH}/build/ssl/${CMAKE_BUILD_TYPE}/ssl.lib
-                ${SSL_PATH}/build/crypto/${CMAKE_BUILD_TYPE}/crypto.lib
-        )
-        else()
-            set(SSL_LIB_PATH
-                ${SSL_PATH}/build/ssl/libssl.a
-                ${SSL_PATH}/build/crypto/libcrypto.a
-            )
+            set(SSL_LIB_PATH ${boringssl_LIBRARY})
+            set(SSL_INC_PATH ${boringssl_INCLUDE_DIR})
         endif()
-    endif()
+    else()
+        if(NOT SSL_PATH)
+            set(SSL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/boringssl)
+        endif()
+
+        # ssl lib denpendency
+        if(NOT SSL_LIB_PATH)
+            if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+                add_definitions(-DNOCRYPT=1)
+                set(SSL_LIB_PATH
+                    ${SSL_PATH}/build/ssl/${CMAKE_BUILD_TYPE}/ssl.lib
+                    ${SSL_PATH}/build/crypto/${CMAKE_BUILD_TYPE}/crypto.lib
+            )
+            else()
+                set(SSL_LIB_PATH
+                    ${SSL_PATH}/build/ssl/libssl.a
+                    ${SSL_PATH}/build/crypto/libcrypto.a
+                )
+            endif()
+        endif()
+    endif()#MSVC
+    # PATH of ssl
+    
 endif()
 
 # ssl include path
@@ -289,6 +302,7 @@ else()
         ${SSL_LIB_PATH}
         "-Wl,--no-whole-archive"
         -lpthread
+        ${OTH_LIBRARY}
     )
 endif()
 
